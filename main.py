@@ -18,9 +18,9 @@ trip_data = {
         {"id": "h7", "name": "Oyado Nono Namba Natural Hot Spring (1.10–4.10)", "price_ils": 2603.0},
     ],
     "trains": [
-        {"id": "t1", "name": "סאפורו ==> אגם טויה (14.9)", "price_ils": 270.19},
-        {"id": "t2", "name": "אגם טויה <== אאומורי (15.9 - מקטע 1)", "price_ils": 219.68},
-        {"id": "t3", "name": "אגם טויה <== אאומורי (15.9 - מקטע 2)", "price_ils": 317.04},
+        {"id": "t1", "name": "סאפורו <== אגם טויה (14.9)", "price_ils": 270.19},
+        {"id": "t2", "name": "אגם טויה ==> אאומורי (15.9 - מקטע 1)", "price_ils": 219.68},
+        {"id": "t3", "name": "אגם טויה ==> אאומורי (15.9 - מקטע 2)", "price_ils": 317.04},
         {"id": "t4", "name": "אאומורי ==> טוקיו (18.9)", "price_ils": 376.34},
         {"id": "t5", "name": "טוקיו ==> טאקאיאמה (23.9)", "price_ils": 346.15},
         {"id": "t6", "name": "טאקאיאמה ==> קיוטו (26.9)", "price_ils": 230.74},
@@ -670,7 +670,7 @@ def index():
         sum(item['price_ils'] for city_attrs in trip_data['attractions'].values() for item in city_attrs)
     )
     content = f"""
-    <h1>מסע קסום ליפן 2026 🇯🇵</h1>
+    <h1טיול ליפן 2026 🇯🇵</h1>
     <p style="text-align: center; color: #94a3b8; font-size: 15px; margin-bottom: 30px;">מערכת ניהול מתקדמת לתקציב ולמסלול הטיול שלך. בחר בתפריט מעלה לעדכון מחירים.</p>
     <div class="total-box">
         סך הכל כללי משוער לטיול: ₪{total:,.2f}
