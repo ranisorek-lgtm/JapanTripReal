@@ -1,5 +1,7 @@
 from flask import Flask, render_template_string, request, redirect, url_for
+from flask import Flask, render_template, jsonify
 import os
+
 
 app = Flask(__name__)
 
@@ -309,6 +311,14 @@ LAYOUT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תכנון טיול ליפן 🇯🇵</title>
+    <!-- שורות חדשות עבור אפליקציית PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ff4757">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="טיול ליפן">
+    <!-- שאר העיצוב שלך... -->
     <title>תכנון טיול ליפן 🇯🇵</title>
     <style>
         :root {
@@ -670,7 +680,7 @@ def index():
         sum(item['price_ils'] for city_attrs in trip_data['attractions'].values() for item in city_attrs)
     )
     content = f"""
-    <h1טיול ליפן 2026 🇯🇵</h1>
+    <h1>טיול ליפן 2026 🇯🇵</h1>
     <p style="text-align: center; color: #94a3b8; font-size: 15px; margin-bottom: 30px;">מערכת ניהול מתקדמת לתקציב ולמסלול הטיול שלך. בחר בתפריט מעלה לעדכון מחירים.</p>
     <div class="total-box">
         סך הכל כללי משוער לטיול: ₪{total:,.2f}
@@ -698,6 +708,24 @@ def stays():
                 continue
         return redirect(url_for('stays'))
 
+# נתיב חדש עבור ה-Manifest של האפליקציה בטלפון
+@app.route('/manifest.json')
+def manifest():
+    return jsonify({
+        "name": "תכנון טיול ליפן 2026",
+        "short_name": "טיול ליפן",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0f111a",
+        "theme_color": "#ff4757",
+        "icons": [
+            {
+                "src": "https://img.icons8.com/color/512/japan.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ]
+    })
     content = """
     <h2>ניהול טיסות ומלונות</h2>
     <form method="POST">

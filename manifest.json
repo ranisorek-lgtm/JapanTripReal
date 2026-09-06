@@ -1,0 +1,15 @@
+{
+  "name": "תכנון טיול ליפן 2026",
+  "short_name": "טיול ליפן",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f111a",
+  "theme_color": "#ff4757",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/512/japan.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
