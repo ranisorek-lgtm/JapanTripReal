@@ -4,7 +4,7 @@ import os
 
 DATA_FILE = "trip_data.json"
 
-# מבנה ברירת המחדל המלא של הנתונים
+# מבנה ברירת המחדל המלא של הנתונים (ללא רשימות צ'ק-ליסט בהתחלה)
 DEFAULT_TRIP_DATA = {
     "flights": [
         {"id": "f1", "name": "טיסות בינלאומיות (תל אביב - אוסקה הלוך ושוב)", "price_ils": 17300.0}
@@ -28,23 +28,7 @@ DEFAULT_TRIP_DATA = {
         {"id": "t6", "name": "טאקאיאמה ==> קיוטו (26.9)", "price_ils": 230.74},
         {"id": "t7", "name": "קיוטו ==> אוסקה (1.10)", "price_ils": 31.04},
     ],
-    "checklists": {
-        "c1": {
-            "title": "ציוד חובה לטיסה",
-            "items": [
-                {"id": "i1", "text": "דרכון בתוקף לפחות חצי שנה", "done": True},
-                {"id": "i2", "text": "כרטיסי טיסה וביטוח נסיעות", "done": True},
-                {"id": "i3", "text": "כסף מזומן (ין יפני)", "done": False}
-            ]
-        },
-        "c2": {
-            "title": "דברים לקנות ביפן",
-            "items": [
-                {"id": "i4", "text": "שוקולד מיוחד מסאפורו", "done": False},
-                {"id": "i5", "text": "מזכרות מקיוטו", "done": False}
-            ]
-        }
-    },
+    "checklists": {},
     "attractions": {
         "סאפורו": [
             {
@@ -1350,7 +1334,7 @@ def index():
                 <input type="number" id="jpyInput" placeholder="הכנס סכום ב-¥" style="width: 100%; box-sizing: border-box;" oninput="convertFromJpy()">
             </div>
         </div>
-        <div id="rateStatus" style="text-align: center; font-size: 12px; color: var(--text-muted); margin-טופ: 15px;">טוען שער חליפין חי...</div>
+        <div id="rateStatus" style="text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 15px;">טוען שער חליפין חי...</div>
     </div>
 
     <script>
@@ -1709,12 +1693,16 @@ def checklists():
             checked_attr = "checked" if item['done'] else ""
             items_html += f"""
             <li class="checklist-item {done_class}">
-                <form method="POST" style="display: flex; align-items: center; width: 100%; margin: 0;">
+                <form method="POST" id="form_toggle_{item['id']}" style="display: flex; align-items: center; width: 100%; margin: 0;">
                     <input type="hidden" name="action" value="toggle_item">
                     <input type="hidden" name="list_id" value="{cid}">
                     <input type="hidden" name="item_id" value="{item['id']}">
+                    <input type="hidden" name="is_done" id="input_is_done_{item['id']}" value="{'on' if item['done'] else 'off'}">
                     <label>
-                        <input type="checkbox" name="is_done" {checked_attr} onchange="this.form.submit()">
+                        <input type="checkbox" {checked_attr} onchange="
+                            document.getElementById('input_is_done_{item['id']}').value = this.checked ? 'on' : 'off';
+                            document.getElementById('form_toggle_{item['id']}').submit();
+                        ">
                         <span>{item['text']}</span>
                     </label>
                 </form>
