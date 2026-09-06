@@ -1,9 +1,32 @@
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify
-import json
 import os
+import json
 
-DATA_FILE = "trip_data.json"
+DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trip_data.json")
 
+def load_data():
+    if os.path.exists(DATA_FILE):
+        print(f"Loading data from: {DATA_FILE}")
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+                # וידוא שכל המפתחות הראשיים קיימים
+                for key in DEFAULT_TRIP_DATA:
+                    if key not in data:
+                        data[key] = DEFAULT_TRIP_DATA[key]
+                return data
+            except json.JSONDecodeError as e:
+                print(f"JSONDecodeError: {e}. Using default data.")
+                return DEFAULT_TRIP_DATA
+    else:
+        print(f"Data file not found at {DATA_FILE}. Creating new one with defaults.")
+        save_data(DEFAULT_TRIP_DATA)
+        return DEFAULT_TRIP_DATA
+
+def save_data(data):
+    print(f"Saving data to: {DATA_FILE}")
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 # מבנה ברירת המחדל המלא של הנתונים (ללא רשימות צ'ק-ליסט בהתחלה)
 DEFAULT_TRIP_DATA = {
     "flights": [
@@ -599,23 +622,6 @@ DEFAULT_TRIP_DATA = {
         ]
     }
 }
-
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-                for key in DEFAULT_TRIP_DATA:
-                    if key not in data:
-                        data[key] = DEFAULT_TRIP_DATA[key]
-                return data
-            except json.JSONDecodeError:
-                return DEFAULT_TRIP_DATA
-    return DEFAULT_TRIP_DATA
-
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
 
 app = Flask(__name__)
 
@@ -1476,7 +1482,9 @@ def service_worker():
 def stays():
     trip_data = load_data()
     if request.method == 'POST':
+        # כאן אפשר להוסיף לוגיקה אם תרצה בעתיד, כרגע מפנה חזרה לדף
         return redirect(url_for('stays'))
+    # ... שאר הקוד של הפונקציה ...
 
     content = """
     <h2>ניהול טיסות ומלונות</h2>
