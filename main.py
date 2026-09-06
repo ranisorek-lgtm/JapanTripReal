@@ -1,6 +1,8 @@
-from flask import Flask, render_template_string, request, redirect, url_for, jsonify
+from flask import Flask, render_template_string, request, redirect, url_for, jsonify, Response
 import json
 import os
+import html
+from functools import wraps
 
 # Allow overriding via env var so data can live on a Render persistent disk;
 # otherwise default next to this file (works locally regardless of cwd).
@@ -618,10 +620,29 @@ def load_data():
     return DEFAULT_TRIP_DATA
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+    # write to a temp file then atomically replace to avoid corrupting the data on a crash/concurrent write
+    tmp_path = DATA_FILE + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    os.replace(tmp_path, DATA_FILE)
 
 app = Flask(__name__)
+
+# Optional password gate for editing routes; unset locally, set on Render to lock down public edits.
+APP_PASSWORD = os.environ.get("APP_PASSWORD")
+
+def require_auth(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if APP_PASSWORD:
+            auth = request.authorization
+            if not auth or auth.password != APP_PASSWORD:
+                return Response(
+                    "Authentication required", 401,
+                    {"WWW-Authenticate": 'Basic realm="Trip Planner"'}
+                )
+        return f(*args, **kwargs)
+    return wrapper
 
 LAYOUT = """
 <!DOCTYPE html>
@@ -1543,6 +1564,7 @@ def manifest():
     })
 
 @app.route('/trains', methods=['GET', 'POST'])
+@require_auth
 def trains():
     trip_data = load_data()
     if request.method == 'POST':
@@ -1574,6 +1596,7 @@ def trains():
     return render_template_string(LAYOUT, content=content)
 
 @app.route('/attractions', methods=['GET', 'POST'])
+@require_auth
 def attractions():
     trip_data = load_data()
     if request.method == 'POST':
@@ -1634,6 +1657,7 @@ def attractions():
     return render_template_string(LAYOUT, content=content)
 
 @app.route('/checklists', methods=['GET', 'POST'])
+@require_auth
 def checklists():
     trip_data = load_data()
     
@@ -1707,7 +1731,7 @@ def checklists():
                             document.getElementById('input_is_done_{item['id']}').value = this.checked ? 'on' : 'off';
                             document.getElementById('form_toggle_{item['id']}').submit();
                         ">
-                        <span>{item['text']}</span>
+                        <span>{html.escape(item['text'])}</span>
                     </label>
                 </form>
                 <form method="POST" style="margin: 0;">
@@ -1724,7 +1748,7 @@ def checklists():
             <div class="checklist-header" onclick="toggleChecklist(this)">
                 <h3>
                     <span class="toggle-icon">▼</span>
-                    📋 {cdata['title']}
+                    📋 {html.escape(cdata['title'])}
                 </h3>
                 <form method="POST" style="margin: 0;" onsubmit="event.stopPropagation(); return confirm('האם למחוק את כל הרשימה?')">
                     <input type="hidden" name="action" value="delete_list">
