@@ -708,6 +708,41 @@ def stays():
                 continue
         return redirect(url_for('stays'))
 
+    # בניית ה-HTML בצורה בטוחה וברורה
+    content = """
+    <h2>ניהול טיסות ומלונות</h2>
+    <form method="POST">
+        <h3 style="text-align: right; color: #ff4757; margin-top: 25px;">✈️ טיסות בינלאומיות</h3>
+        <div class="table-responsive">
+            <table>
+                <tr><th>תיאור</th><th>מחיר ב-₪</th></tr>
+    """
+    
+    for f in trip_data['flights']:
+        content += f"<tr><td>{f['name']}</td><td><input type='number' step='0.01' name='flight_{f['id']}' value='{f['price_ils']}'></td></tr>"
+
+    content += """
+            </table>
+        </div>
+
+        <h3 style="text-align: right; color: #ff4757; margin-top: 35px;">🏨 מלונות לאורך המסלול</h3>
+        <div class="table-responsive">
+            <table>
+                <tr><th>מלון / תאריכים</th><th>מחיר ב-₪</th></tr>
+    """
+
+    for h in trip_data['hotels']:
+        content += f"<tr><td>{h['name']}</td><td><input type='number' step='0.01' name='hotel_{h['id']}' value='{h['price_ils']}'></td></tr>"
+
+    content += """
+            </table>
+        </div>
+        <div style="text-align: center; margin-top: 30px;"><button type="submit">שמור שינויים</button></div>
+    </form>
+    """
+    
+    return render_template_string(LAYOUT, content=content)
+
 # נתיב חדש עבור ה-Manifest של האפליקציה בטלפון
 @app.route('/manifest.json')
 def manifest():
