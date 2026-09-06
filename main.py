@@ -1,21 +1,23 @@
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify
+import json
 import os
 
-app = Flask(__name__)
+DATA_FILE = "trip_data.json"
 
-# מבנה הנתונים המלא עם מידע מורחב ומפורט על כל האטרקציות
-trip_data = {
+# מבנה ברירת המחדל המלא של הנתונים
+DEFAULT_TRIP_DATA = {
     "flights": [
         {"id": "f1", "name": "טיסות בינלאומיות (תל אביב - אוסקה הלוך ושוב)", "price_ils": 17300.0}
     ],
     "hotels": [
-        {"id": "h1", "name": "Keio Plaza Hotel Sapporo (11.9–14.9)", "price_ils": 2290.0},
-        {"id": "h2", "name": "Yutorelo Toyako (14.9–15.9)", "price_ils": 542.0},
-        {"id": "h3", "name": "Daiwa Roynet Hotel Aomori (15.9–18.9)", "price_ils": 1015.0},
-        {"id": "h4", "name": "Tokyu Stay Aoyama Premier (18.9–23.9)", "price_ils": 3168.0},
-        {"id": "h5", "name": "Hotel and spa gift Takayama (24.9–26.9)", "price_ils": 813.0},
-        {"id": "h6", "name": "Hotel Gracery Kyoto Sanjo (26.9–1.10)", "price_ils": 2015.0},
-        {"id": "h7", "name": "Oyado Nono Namba Natural Hot Spring (1.10–4.10)", "price_ils": 2603.0},
+        {"id": "h1", "name": "Keio Plaza Hotel Sapporo (11.9–14.9)", "price_ils": 2290.0, "address": "2 Chome-2-1 Kita 5 Jonishi, Chuo Ward, Sapporo, Hokkaido 060-0005, Japan"},
+        {"id": "h2", "name": "Yutorelo Toyako (14.9–15.9)", "price_ils": 542.0, "address": "68-1 Maruyama, Abuta-gun, Toyako-cho, Hokkaido 049-5721, Japan"},
+        {"id": "h3", "name": "Daiwa Roynet Hotel Aomori (15.9–18.9)", "price_ils": 1015.0, "address": "1 Chome-1-23 Shinmachi, Aomori, 030-0801, Japan"},
+        {"id": "h4", "name": "Tokyu Stay Aoyama Premier (18.9–23.9)", "price_ils": 3168.0, "address": "2 Chome-7-18 Minamiaoyama, Minato City, Tokyo 107-0062, Japan"},
+        {"id": "h8", "name": "Takayama Ouan - פמילי רום עם ארוחת בוקר (23.9–24.9) [הוזמן ב-32,071 מיילים]", "price_ils": 0.0, "address": "4 Chome-327 Hanakokuracho, Takayama, Gifu 506-0007, Japan"},
+        {"id": "h5", "name": "Hotel and spa gift Takayama (24.9–26.9)", "price_ils": 813.0, "address": "6 Chome-888-1 Nishinoisshicho, Takayama, Gifu 506-0031, Japan"},
+        {"id": "h6", "name": "Hotel Gracery Kyoto Sanjo (26.9–1.10)", "price_ils": 2015.0, "address": "420 Nakajimacho, Nakagyo Ward, Kyoto, 604-8032, Japan"},
+        {"id": "h7", "name": "Oyado Nono Namba Natural Hot Spring (1.10–4.10)", "price_ils": 2603.0, "address": "1 Chome-4-17 Nipponbashi, Chuo Ward, Osaka, 542-0073, Japan"},
     ],
     "trains": [
         {"id": "t1", "name": "סאפורו <== אגם טויה (14.9)", "price_ils": 270.19},
@@ -26,6 +28,23 @@ trip_data = {
         {"id": "t6", "name": "טאקאיאמה ==> קיוטו (26.9)", "price_ils": 230.74},
         {"id": "t7", "name": "קיוטו ==> אוסקה (1.10)", "price_ils": 31.04},
     ],
+    "checklists": {
+        "c1": {
+            "title": "ציוד חובה לטיסה",
+            "items": [
+                {"id": "i1", "text": "דרכון בתוקף לפחות חצי שנה", "done": True},
+                {"id": "i2", "text": "כרטיסי טיסה וביטוח נסיעות", "done": True},
+                {"id": "i3", "text": "כסף מזומן (ין יפני)", "done": False}
+            ]
+        },
+        "c2": {
+            "title": "דברים לקנות ביפן",
+            "items": [
+                {"id": "i4", "text": "שוקולד מיוחד מסאפורו", "done": False},
+                {"id": "i5", "text": "מזכרות מקיוטו", "done": False}
+            ]
+        }
+    },
     "attractions": {
         "סאפורו": [
             {
@@ -597,6 +616,25 @@ trip_data = {
     }
 }
 
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+                for key in DEFAULT_TRIP_DATA:
+                    if key not in data:
+                        data[key] = DEFAULT_TRIP_DATA[key]
+                return data
+            except json.JSONDecodeError:
+                return DEFAULT_TRIP_DATA
+    return DEFAULT_TRIP_DATA
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+app = Flask(__name__)
+
 LAYOUT = """
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -605,39 +643,46 @@ LAYOUT = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>תכנון טיול ליפן 🇯🇵</title>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#ff4757">
+    <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="טיול ליפן">
     <style>
         :root {
-            --bg-color: #0f111a;
-            --card-bg: #1a1c29;
-            --border-color: #2b2f42;
-            --text-color: #e2e8f0;
+            --bg-color: #0b0c10;
+            --card-bg: #14151b;
+            --card-hover: #1c1e26;
+            --border-color: #272935;
+            --text-color: #f4f4f5;
             --text-muted: #94a3b8;
-            --accent-color: #ff4757;
-            --accent-hover: #ff6b81;
-            --success-color: #2ed573;
+            --accent-color: #6366f1;
+            --accent-hover: #818cf8;
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            --success-color: #10b981;
+            --danger-color: #ef4444;
         }
+        
         body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background-color: var(--bg-color); 
             color: var(--text-color); 
             margin: 0; 
             padding: 15px; 
+            -webkit-font-smoothing: antialiased;
         }
+        
         .container { 
             max-width: 1100px; 
             margin: auto; 
             background: var(--card-bg); 
-            padding: 20px; 
-            border-radius: 16px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            padding: 24px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6); 
             border: 1px solid var(--border-color);
         }
+        
         @media(min-width: 768px) {
-            body { padding: 30px; }
+            body { padding: 40px; }
             .container { padding: 40px; }
         }
 
@@ -646,35 +691,45 @@ LAYOUT = """
             text-align: center; 
             font-weight: 700;
         }
-        h1 { color: var(--accent-color); font-size: 1.8rem; margin-bottom: 10px; }
+        
+        h1 { 
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2rem; 
+            margin-bottom: 8px; 
+        }
+        
         @media(min-width: 768px) {
-            h1 { font-size: 2.2rem; }
+            h1 { font-size: 2.6rem; }
         }
         
         nav { 
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 30px; 
-            background: #131520; 
-            padding: 10px; 
-            border-radius: 12px;
+            background: #0f1015; 
+            padding: 8px; 
+            border-radius: 14px;
             border: 1px solid var(--border-color);
         }
+        
         nav a { 
             color: var(--text-muted); 
             text-decoration: none; 
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 10px 16px;
+            border-radius: 10px;
             font-weight: 600; 
             font-size: 14px; 
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             text-align: center;
         }
+        
         nav a:hover { 
             color: #fff; 
-            background: var(--accent-color); 
+            background: rgba(99, 102, 241, 0.15); 
         }
 
         .table-responsive {
@@ -682,105 +737,194 @@ LAYOUT = """
             overflow-x: auto;
             margin-bottom: 30px;
             -webkit-overflow-scrolling: touch;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
         }
+        
         table { 
             width: 100%; 
             border-collapse: collapse; 
-            background: #141622;
-            border-radius: 8px;
-            overflow: hidden;
+            background: #111218;
             min-width: 320px;
         }
+        
         th, td { 
-            padding: 12px 15px; 
+            padding: 14px 18px; 
             border-bottom: 1px solid var(--border-color); 
             text-align: right; 
             font-size: 14px;
         }
+        
         th { 
-            background-color: #1f2233; 
+            background-color: #181922; 
             color: #fff;
             font-weight: 600;
+            letter-spacing: 0.03em;
         }
-        tr:hover { background-color: #1a1c29; }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover td { 
+            background-color: var(--card-hover); 
+        }
 
-        input[type="number"] { 
-            width: 80px; 
-            padding: 8px; 
+        input[type="number"], input[type="text"] { 
+            padding: 10px 14px; 
             font-size: 14px; 
-            background: #0f111a;
+            background: #0b0c10;
             border: 1px solid var(--border-color);
             color: #fff;
-            border-radius: 6px;
-            text-align: center;
+            border-radius: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
+        
+        input[type="number"] { width: 90px; text-align: center; }
+        
         @media(min-width: 768px) {
-            input[type="number"] { width: 100px; }
+            input[type="number"] { width: 120px; }
         }
-        input[type="number"]:focus {
+        
+        input[type="text"] { width: 100%; box-sizing: border-box; }
+        
+        input:focus {
             border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
             outline: none;
         }
 
         button { 
-            background-color: var(--accent-color); 
+            background: var(--accent-gradient);
             color: white; 
             border: none; 
-            padding: 12px 25px; 
-            border-radius: 8px; 
+            padding: 12px 28px; 
+            border-radius: 12px; 
             cursor: pointer; 
-            font-size: 16px; 
-            font-weight: bold; 
-            transition: background 0.3s;
-            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+            font-size: 15px; 
+            font-weight: 600; 
+            transition: transform 0.1s ease, opacity 0.2s;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
             width: 100%;
         }
+        
         @media(min-width: 768px) {
             button { width: auto; }
         }
-        button:hover { background-color: var(--accent-hover); }
+        
+        button:hover { opacity: 0.9; }
+        button:active { transform: scale(0.98); }
 
-        .total-box { 
-            background: linear-gradient(135deg, #1f2233 0%, #141622 100%);
+        .copy-btn {
+            background-color: #21232d;
+            color: #e2e8f0;
             border: 1px solid var(--border-color);
-            padding: 20px; 
-            border-radius: 12px; 
-            text-align: center; 
-            font-size: 20px; 
-            font-weight: bold; 
-            margin-top: 30px; 
-            color: var(--success-color);
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
-        }
-        @media(min-width: 768px) {
-            .total-box { font-size: 26px; padding: 25px; }
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            width: auto;
+            box-shadow: none;
         }
         
+        .copy-btn:hover {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .danger-btn {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            width: auto;
+            box-shadow: none;
+        }
+        
+        .danger-btn:hover {
+            background-color: var(--danger-color);
+            color: #fff;
+        }
+
+        .total-box { 
+            background: linear-gradient(135deg, #181922 0%, #111218 100%);
+            border: 1px solid var(--border-color);
+            padding: 24px; 
+            border-radius: 16px; 
+            text-align: center; 
+            font-size: 22px; 
+            font-weight: bold; 
+            margin-top: 35px; 
+            color: var(--success-color);
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        @media(min-width: 768px) {
+            .total-box { font-size: 28px; padding: 30px; }
+        }
+        
+        .filter-nav {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .filter-btn {
+            background-color: #111218;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: none;
+            width: auto;
+        }
+        
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--accent-gradient);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
         .attractions-grid { 
             display: grid; 
             grid-template-columns: 1fr; 
             gap: 20px; 
             margin-bottom: 35px; 
         }
+        
         @media(min-width: 600px) {
             .attractions-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
         }
 
         .attraction-card { 
-            background: #141622; 
+            background: #111218; 
             border: 1px solid var(--border-color); 
-            border-radius: 12px; 
+            border-radius: 16px; 
             overflow: hidden; 
             display: flex; 
             flex-direction: column; 
             justify-content: space-between;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
         }
+        
         .attraction-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-            border-color: #3b4259;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+            border-color: rgba(99, 102, 241, 0.4);
         }
+        
         .attraction-card img { 
             width: 100%; 
             height: 160px; 
@@ -788,21 +932,27 @@ LAYOUT = """
             cursor: pointer;
             transition: opacity 0.2s;
         }
+        
         .attraction-card img:hover {
-            opacity: 0.85;
+            opacity: 0.9;
         }
+        
         .attraction-body { 
             padding: 16px; 
         }
+        
         .attraction-body h4 { 
             margin: 0 0 8px 0; 
             color: #fff; 
-            font-size: 17px;
+            font-size: 16px;
             cursor: pointer;
+            transition: color 0.2s;
         }
+        
         .attraction-body h4:hover {
             color: var(--accent-hover);
         }
+        
         .attraction-body p { 
             font-size: 13px; 
             color: var(--text-muted); 
@@ -813,23 +963,146 @@ LAYOUT = """
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+        
         .attraction-footer { 
             padding: 12px 16px; 
-            background: #181b28; 
+            background: #15161f; 
             border-top: 1px solid var(--border-color); 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-muted);
         }
+        
+        .city-section {
+            margin-bottom: 30px;
+        }
+        
         .city-title {
-            color: #38ef7d;
+            color: var(--success-color);
             border-bottom: 2px solid var(--border-color);
-            padding-bottom: 8px;
-            margin-top: 35px;
+            padding-bottom: 10px;
+            margin-top: 40px;
             margin-bottom: 20px;
-            font-size: 1.3rem;
+            font-size: 1.4rem;
+            text-align: right;
+        }
+
+        .checklist-card {
+            background: #111218;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 25px;
+            transition: border-color 0.2s;
+        }
+        
+        .checklist-card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+        
+        .checklist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .checklist-header h3 {
+            margin: 0;
+            color: #fff;
+            font-size: 1.15rem;
+            text-align: right;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .toggle-icon {
+            font-size: 12px;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+        }
+        
+        .checklist-card.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+        
+        .checklist-content-wrapper {
+            max-height: 2000px;
+            overflow: hidden;
+            transition: max-height 0.4s ease, opacity 0.3s ease;
+            opacity: 1;
+        }
+        
+        .checklist-card.collapsed .checklist-content-wrapper {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .checklist-items {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+        }
+        
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        
+        .checklist-item label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            flex-grow: 1;
+        }
+        
+        .checklist-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--success-color);
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .checklist-item.done span {
+            text-decoration: line-through;
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        
+        .add-item-form {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .add-item-form input {
+            flex-grow: 1;
+        }
+        
+        .add-item-form button {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 14px;
+            background: var(--success-color);
+            box-shadow: none;
+        }
+        
+        .add-item-form button:hover {
+            opacity: 0.9;
         }
 
         .modal {
@@ -840,76 +1113,109 @@ LAYOUT = """
             top: 0;
             width: 100%; 
             height: 100%; 
-            background-color: rgba(0,0,0,0.85); 
-            backdrop-filter: blur(5px);
+            background-color: rgba(5,6,8,0.85); 
+            backdrop-filter: blur(8px);
             align-items: center;
             justify-content: center;
             padding: 15px;
             box-sizing: border-box;
         }
+        
         .modal-content {
-            background-color: #161925;
+            background-color: #14151b;
             border: 1px solid var(--border-color);
-            padding: 20px;
-            border-radius: 16px;
+            padding: 24px;
+            border-radius: 20px;
             width: 100%;
             max-width: 500px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
             position: relative;
             text-align: right;
-            animation: modalOpen 0.3s ease;
+            animation: modalOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             max-height: 85vh;
             overflow-y: auto;
         }
-        @media(min-width: 768px) {
-            .modal-content { padding: 30px; }
-        }
+        
         @keyframes modalOpen {
-            from {transform: scale(0.9); opacity: 0;}
+            from {transform: scale(0.92); opacity: 0;}
             to {transform: scale(1); opacity: 1;}
         }
+        
         .modal-content img {
             width: 100%;
-            height: 200px;
+            height: 220px;
             object-fit: cover;
-            border-radius: 10px;
-            margin-bottom: 15px;
+            border-radius: 12px;
+            margin-bottom: 16px;
         }
-        @media(min-width: 768px) {
-            .modal-content img { height: 250px; margin-bottom: 20px; }
-        }
+        
         .modal-content h3 {
             margin-top: 0;
             color: #fff;
             font-size: 20px;
+            text-align: right;
         }
-        @media(min-width: 768px) {
-            .modal-content h3 { font-size: 22px; }
-        }
+        
         .modal-content p {
             color: var(--text-muted);
             font-size: 14px;
             line-height: 1.6;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            text-align: right;
         }
-        @media(min-width: 768px) {
-            .modal-content p { font-size: 15px; }
-        }
+        
         .close-btn {
-            background: var(--accent-color);
-            color: white;
+            background: var(--border-color);
+            color: #fff;
             border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: 12px 24px;
+            border-radius: 10px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
             width: 100%;
+            box-shadow: none;
         }
+        
         @media(min-width: 768px) {
             .close-btn { width: auto; float: left; }
         }
+        
         .close-btn:hover {
-            background: var(--accent-hover);
+            background: #3f4255;
+            opacity: 1;
+        }
+        
+        .toast {
+            visibility: hidden;
+            min-width: 220px;
+            background-color: var(--success-color);
+            color: #fff;
+            text-align: center;
+            border-radius: 10px;
+            padding: 12px 20px;
+            position: fixed;
+            z-index: 2000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        
+        .toast.show {
+            visibility: visible;
+            animation: fadein 0.4s, fadeout 0.4s 2.2s;
+        }
+        
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 30px; opacity: 1;}
+        }
+        
+        @keyframes fadeout {
+            from {bottom: 30px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
         }
     </style>
 </head>
@@ -920,6 +1226,8 @@ LAYOUT = """
         <a href="/stays">טיסות ומלונות</a>
         <a href="/trains">רכבות</a>
         <a href="/attractions">אטרקציות ופעילויות</a>
+        <a href="/checklists">רשימות צ'ק-ליסט</a>
+        <a href="/converter">💱 ממיר מטבע</a>
     </nav>
     {{ content | safe }}
 </div>
@@ -934,8 +1242,9 @@ LAYOUT = """
     </div>
 </div>
 
+<div id="toast" class="toast">הכתובת הועתקה ללוח! 📋</div>
+
 <script>
-    // רישום ה-Service Worker כדי לאפשר עבודה באופליין
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
@@ -961,6 +1270,50 @@ LAYOUT = """
             modal.style.display = 'none';
         }
     }
+
+    function copyAddress(addressText) {
+        var textarea = document.createElement("textarea");
+        textarea.value = addressText;
+        textarea.style.position = "fixed";  
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        try {
+            var successful = document.execCommand('copy');
+            if (successful) {
+                var toast = document.getElementById("toast");
+                toast.className = "toast show";
+                setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
+            } else {
+                alert("ההעתקה נכשלה. נסה להעתיק ידנית.");
+            }
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            alert("שגיאה בהעתקת הטקסט.");
+        }
+
+        document.body.removeChild(textarea);
+    }
+
+    function toggleChecklist(headerElem) {
+        var card = headerElem.closest('.checklist-card');
+        card.classList.toggle('collapsed');
+    }
+
+    function filterAttractions(cityName, btnElem) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btnElem.classList.add('active');
+
+        document.querySelectorAll('.city-section').forEach(section => {
+            if (cityName === 'all' || section.getAttribute('data-city') === cityName) {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        });
+    }
 </script>
 </body>
 </html>
@@ -968,6 +1321,7 @@ LAYOUT = """
 
 @app.route('/')
 def index():
+    trip_data = load_data()
     total = (
         sum(item['price_ils'] for item in trip_data['trains']) +
         sum(item['price_ils'] for item in trip_data['hotels']) +
@@ -976,10 +1330,122 @@ def index():
     )
     content = f"""
     <h1>טיול ליפן 2026 🇯🇵</h1>
-    <p style="text-align: center; color: #94a3b8; font-size: 15px; margin-bottom: 30px;">מערכת ניהול מתקדמת לתקציב ולמסלול הטיול שלך. בחר בתפריט מעלה לעדכון מחירים.</p>
+    <p style="text-align: center; color: var(--text-muted); font-size: 15px; margin-bottom: 30px;">מערכת ניהול מתקדמת לתקציב ולמסלול הטיול שלך. בחר בתפריט מעלה לעדכון מחירים.</p>
     <div class="total-box">
         סך הכל כללי משוער לטיול: ₪{total:,.2f}
     </div>
+
+    <!-- ווידג'ט ממיר מטבע מהיר בדף הבית -->
+    <div class="checklist-card" style="margin-top: 30px;">
+        <h3 style="text-align: right; margin-top: 0; color: #fff; font-size: 1.2rem;">💱 ממיר שקל (ILS) ל-ין יפני (JPY) בזמן אמת</h3>
+        <p style="color: var(--text-muted); font-size: 13px; text-align: right; margin-bottom: 20px;">השער מתעדכן אוטומטית מול הרשת.</p>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; align-items: center;">
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; text-align: right;">שקלים (₪):</label>
+                <input type="number" id="ilsInput" placeholder="הכנס סכום ב-₪" style="width: 100%; box-sizing: border-box;" oninput="convertFromIls()">
+            </div>
+            <div style="font-size: 24px; color: var(--accent-hover); font-weight: bold; align-self: flex-end; padding-bottom: 8px;">⇄</div>
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; text-align: right;">ין יפני (¥):</label>
+                <input type="number" id="jpyInput" placeholder="הכנס סכום ב-¥" style="width: 100%; box-sizing: border-box;" oninput="convertFromJpy()">
+            </div>
+        </div>
+        <div id="rateStatus" style="text-align: center; font-size: 12px; color: var(--text-muted); margin-טופ: 15px;">טוען שער חליפין חי...</div>
+    </div>
+
+    <script>
+        let liveRate = 40.0; // ברירת מחדל זמנית עד שה-API מטעין
+        
+        async function fetchExchangeRate() {{
+            try {{
+                let response = await fetch('https://open.er-api.com/v6/latest/ILS');
+                let data = await response.json();
+                if (data && data.rates && data.rates.JPY) {{
+                    liveRate = data.rates.JPY;
+                    document.getElementById('rateStatus').innerText = `שער חליפין מעודכן: 1 ₪ = ${{liveRate.toFixed(2)}} ¥`;
+                }}
+            }} catch(e) {{
+                document.getElementById('rateStatus').innerText = 'משתמש בשער ברירת מחדל (שגיאת חיבור לרשת)';
+            }}
+        }}
+
+        function convertFromIls() {{
+            let ils = parseFloat(document.getElementById('ilsInput').value);
+            if (isNaN(ils)) {{
+                document.getElementById('jpyInput').value = '';
+                return;
+            }}
+            document.getElementById('jpyInput').value = (ils * liveRate).toFixed(2);
+        }}
+
+        function convertFromJpy() {{
+            let jpy = parseFloat(document.getElementById('jpyInput').value);
+            if (isNaN(jpy)) {{
+                document.getElementById('ilsInput').value = '';
+                return;
+            }}
+            document.getElementById('ilsInput').value = (jpy / liveRate).toFixed(2);
+        }}
+
+        fetchExchangeRate();
+    </script>
+    """
+    return render_template_string(LAYOUT, content=content)
+
+@app.route('/converter')
+def converter():
+    content = f"""
+    <h2>ממיר מטבע מתקדם (שקל ⇄ ין)</h2>
+    <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">המרה מדויקת ועדכנית לכל הוצאה או קנייה ביפן.</p>
+    
+    <div class="checklist-card" style="max-width: 600px; margin: auto; background: #14151b;">
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; font-size: 14px; color: var(--text-muted); margin-bottom: 8px; text-align: right;">סכום בשקלים (ILS):</label>
+            <input type="number" id="pageIlsInput" placeholder="הקלד שקלים..." style="width: 100%; box-sizing: border-box; font-size: 16px; padding: 14px;" oninput="pageConvertFromIls()">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; font-size: 14px; color: var(--text-muted); margin-bottom: 8px; text-align: right;">סכום ביין יפני (JPY):</label>
+            <input type="number" id="pageJpyInput" placeholder="הקלד ין..." style="width: 100%; box-sizing: border-box; font-size: 16px; padding: 14px;" oninput="pageConvertFromJpy()">
+        </div>
+        <div id="pageRateStatus" style="text-align: center; font-size: 13px; color: var(--success-color); font-weight: 600; margin-top: 15px;">טוען שער חליפין מהאינטרנט...</div>
+    </div>
+
+    <script>
+        let pageLiveRate = 40.0;
+        
+        async function fetchPageExchangeRate() {{
+            try {{
+                let response = await fetch('https://open.er-api.com/v6/latest/ILS');
+                let data = await response.json();
+                if (data && data.rates && data.rates.JPY) {{
+                    pageLiveRate = data.rates.JPY;
+                    document.getElementById('pageRateStatus').innerText = `שער חי פעיל: 1 ILS = ${{pageLiveRate.toFixed(2)}} JPY`;
+                }}
+            }} catch(e) {{
+                document.getElementById('pageRateStatus').innerText = 'משתמש בשער קבוע עקב תקשורת';
+            }}
+        }}
+
+        function pageConvertFromIls() {{
+            let ils = parseFloat(document.getElementById('pageIlsInput').value);
+            if (isNaN(ils)) {{
+                document.getElementById('pageJpyInput').value = '';
+                return;
+            }}
+            document.getElementById('pageJpyInput').value = (ils * pageLiveRate).toFixed(2);
+        }}
+
+        function pageConvertFromJpy() {{
+            let jpy = parseFloat(document.getElementById('pageJpyInput').value);
+            if (isNaN(jpy)) {{
+                document.getElementById('pageIlsInput').value = '';
+                return;
+            }}
+            document.getElementById('pageIlsInput').value = (jpy / pageLiveRate).toFixed(2);
+        }}
+
+        fetchPageExchangeRate();
+    </script>
     """
     return render_template_string(LAYOUT, content=content)
 
@@ -992,6 +1458,8 @@ def service_worker():
         '/stays',
         '/trains',
         '/attractions',
+        '/checklists',
+        '/converter',
         '/manifest.json'
     ];
 
@@ -1010,7 +1478,6 @@ def service_worker():
                         return response;
                     }
                     return fetch(event.request).catch(() => {
-                        // במקרה שאין אינטרנט והעמוד לא נמצא בקאש
                         if (event.request.mode === 'navigate') {
                             return caches.match('/');
                         }
@@ -1023,34 +1490,43 @@ def service_worker():
 
 @app.route('/stays', methods=['GET', 'POST'])
 def stays():
+    trip_data = load_data()
     if request.method == 'POST':
         return redirect(url_for('stays'))
 
     content = """
     <h2>ניהול טיסות ומלונות</h2>
-    <p style="text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 25px;">מחירי הטיסות והמלונות נעולים ואינם ניתנים לשינוי.</p>
+    <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">מחירי הטיסות והמלונות נעולים ואינם ניתנים לשינוי. ניתן להעתיק את כתובת המלון בלחיצה.</p>
     <form method="POST">
-        <h3 style="text-align: right; color: #ff4757; margin-top: 25px;">✈️ טיסות בינלאומיות</h3>
+        <h3 style="text-align: right; color: var(--accent-hover); margin-top: 25px;">✈️ טיסות בינלאומיות</h3>
         <div class="table-responsive">
             <table>
                 <tr><th>תיאור</th><th>מחיר ב-₪ (נעול)</th></tr>
     """
     
     for f in trip_data['flights']:
-        content += f"<tr><td>{f['name']}</td><td><input type='number' step='0.01' name='flight_{f['id']}' value='{f['price_ils']}' readonly style='background-color: #1a1c29; color: #64748b; cursor: not-allowed;'></td></tr>"
+        content += f"<tr><td>{f['name']}</td><td><input type='number' step='0.01' name='flight_{f['id']}' value='{f['price_ils']}' readonly style='background-color: #14151b; color: #64748b; cursor: not-allowed;'></td></tr>"
 
     content += """
             </table>
         </div>
 
-        <h3 style="text-align: right; color: #ff4757; margin-top: 35px;">🏨 מלונות לאורך המסלול</h3>
+        <h3 style="text-align: right; color: var(--accent-hover); margin-top: 35px;">🏨 מלונות לאורך המסלול</h3>
         <div class="table-responsive">
             <table>
-                <tr><th>מלון / תאריכים</th><th>מחיר ב-₪ (נעול)</th></tr>
+                <tr><th>מלון / תאריכים וכתובת</th><th>מחיר ב-₪ (נעול)</th></tr>
     """
 
     for h in trip_data['hotels']:
-        content += f"<tr><td>{h['name']}</td><td><input type='number' step='0.01' name='hotel_{h['id']}' value='{h['price_ils']}' readonly style='background-color: #1a1c29; color: #64748b; cursor: not-allowed;'></td></tr>"
+        safe_addr = h['address'].replace("'", "\\'").replace('"', '&quot;')
+        content += f"""<tr>
+            <td>
+                <div style="font-weight: 600; margin-bottom: 4px; color: #fff;">{h['name']}</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">{h['address']}</div>
+                <button type="button" class="copy-btn" onclick="copyAddress('{safe_addr}')">📋 העתק כתובת</button>
+            </td>
+            <td><input type='number' step='0.01' name='hotel_{h['id']}' value='{h['price_ils']}' readonly style='background-color: #14151b; color: #64748b; cursor: not-allowed;'></td>
+        </tr>"""
 
     content += """
             </table>
@@ -1067,8 +1543,8 @@ def manifest():
         "short_name": "טיול ליפן",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#0f111a",
-        "theme_color": "#ff4757",
+        "background_color": "#0b0c10",
+        "theme_color": "#6366f1",
         "icons": [
             {
                 "src": "https://img.icons8.com/color/512/japan.png",
@@ -1080,6 +1556,7 @@ def manifest():
 
 @app.route('/trains', methods=['GET', 'POST'])
 def trains():
+    trip_data = load_data()
     if request.method == 'POST':
         for key, value in request.form.items():
             try:
@@ -1091,6 +1568,7 @@ def trains():
                             t['price_ils'] = val_float
             except ValueError:
                 continue
+        save_data(trip_data)
         return redirect(url_for('trains'))
 
     content = """
@@ -1109,6 +1587,7 @@ def trains():
 
 @app.route('/attractions', methods=['GET', 'POST'])
 def attractions():
+    trip_data = load_data()
     if request.method == 'POST':
         for key, value in request.form.items():
             try:
@@ -1121,11 +1600,21 @@ def attractions():
                                 a['price_ils'] = val_float
             except ValueError:
                 continue
+        save_data(trip_data)
         return redirect(url_for('attractions'))
+
+    filter_buttons_html = "<div class='filter-nav'><button type='button' class='filter-btn active' onclick=\"filterAttractions('all', this)\">הצג הכל</button>"
+    for city in trip_data['attractions'].keys():
+        filter_buttons_html += f"<button type='button' class='filter-btn' onclick=\"filterAttractions('{city}', this)\">{city}</button>"
+    filter_buttons_html += "</div>"
 
     attrs_html = ""
     for city, attrs in trip_data['attractions'].items():
-        attrs_html += f"<h3 class='city-title'>📍 {city}</h3><div class='attractions-grid'>"
+        attrs_html += f"""
+        <div class="city-section" data-city="{city}">
+            <h3 class='city-title'>📍 {city}</h3>
+            <div class='attractions-grid'>
+        """
         for a in attrs:
             safe_name = a['name'].replace("'", "&#39;").replace('"', '&quot;')
             safe_desc = a['desc'].replace("'", "&#39;").replace('"', '&quot;').replace('\n', ' ')
@@ -1143,15 +1632,144 @@ def attractions():
                 </div>
             </div>
             """
-        attrs_html += "</div>"
+        attrs_html += "</div></div>"
 
     content = f"""
     <h2>אטרקציות ופעילויות לפי יעד</h2>
-    <p style="text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 25px;">לחץ על התמונה או על שם האטרקציה כדי לפתוח חלון עם מידע מורחב.</p>
+    <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">לחץ על התמונה או על שם האטרקציה כדי לפתוח חלון עם מידע מורחב.</p>
+    {filter_buttons_html}
     <form method="POST">
         {attrs_html}
         <div style="text-align: center; margin-top: 40px;"><button type="submit">שמור שינויים באטרקציות</button></div>
     </form>
+    """
+    return render_template_string(LAYOUT, content=content)
+
+@app.route('/checklists', methods=['GET', 'POST'])
+def checklists():
+    trip_data = load_data()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add_list':
+            title = request.form.get('list_title', '').strip()
+            if title:
+                new_id = 'c_' + str(os.urandom(4).hex())
+                trip_data['checklists'][new_id] = {
+                    "title": title,
+                    "items": []
+                }
+                save_data(trip_data)
+                
+        elif action == 'delete_list':
+            cid = request.form.get('list_id')
+            if cid in trip_data['checklists']:
+                del trip_data['checklists'][cid]
+                save_data(trip_data)
+                
+        elif action == 'add_item':
+            cid = request.form.get('list_id')
+            text = request.form.get('item_text', '').strip()
+            if cid in trip_data['checklists'] and text:
+                new_item_id = 'i_' + str(os.urandom(4).hex())
+                trip_data['checklists'][cid]['items'].append({
+                    "id": new_item_id,
+                    "text": text,
+                    "done": False
+                })
+                save_data(trip_data)
+                
+        elif action == 'delete_item':
+            cid = request.form.get('list_id')
+            iid = request.form.get('item_id')
+            if cid in trip_data['checklists']:
+                trip_data['checklists'][cid]['items'] = [
+                    item for item in trip_data['checklists'][cid]['items'] if item['id'] != iid
+                ]
+                save_data(trip_data)
+                
+        elif action == 'toggle_item':
+            cid = request.form.get('list_id')
+            iid = request.form.get('item_id')
+            is_done = request.form.get('is_done') == 'on'
+            if cid in trip_data['checklists']:
+                for item in trip_data['checklists'][cid]['items']:
+                    if item['id'] == iid:
+                        item['done'] = is_done
+                save_data(trip_data)
+                
+        return redirect(url_for('checklists'))
+
+    lists_html = ""
+    for cid, cdata in trip_data['checklists'].items():
+        items_html = ""
+        for item in cdata['items']:
+            done_class = "done" if item['done'] else ""
+            checked_attr = "checked" if item['done'] else ""
+            items_html += f"""
+            <li class="checklist-item {done_class}">
+                <form method="POST" style="display: flex; align-items: center; width: 100%; margin: 0;">
+                    <input type="hidden" name="action" value="toggle_item">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <input type="hidden" name="item_id" value="{item['id']}">
+                    <label>
+                        <input type="checkbox" name="is_done" {checked_attr} onchange="this.form.submit()">
+                        <span>{item['text']}</span>
+                    </label>
+                </form>
+                <form method="POST" style="margin: 0;">
+                    <input type="hidden" name="action" value="delete_item">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <input type="hidden" name="item_id" value="{item['id']}">
+                    <button type="submit" class="danger-btn" title="מחק פריט">✕</button>
+                </form>
+            </li>
+            """
+            
+        lists_html += f"""
+        <div class="checklist-card">
+            <div class="checklist-header" onclick="toggleChecklist(this)">
+                <h3>
+                    <span class="toggle-icon">▼</span>
+                    📋 {cdata['title']}
+                </h3>
+                <form method="POST" style="margin: 0;" onsubmit="event.stopPropagation(); return confirm('האם למחוק את כל הרשימה?')">
+                    <input type="hidden" name="action" value="delete_list">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <button type="submit" class="danger-btn" onclick="event.stopPropagation()">מחק רשימה</button>
+                </form>
+            </div>
+            <div class="checklist-content-wrapper">
+                <ul class="checklist-items">
+                    {items_html if items_html else '<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin: 10px 0;">אין עדיין פריטים ברשימה זו.</p>'}
+                </ul>
+                <form method="POST" class="add-item-form">
+                    <input type="hidden" name="action" value="add_item">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <input type="text" name="item_text" placeholder="הוסף פריט חדש..." required>
+                    <button type="submit">הוסף</button>
+                </form>
+            </div>
+        </div>
+        """
+
+    content = f"""
+    <h2>רשימות צ'ק-ליסט ומשימות</h2>
+    <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">צור רשימות חדשות לניהול הציוד, הקניות או המשימות לקראת הטיול.</p>
+    
+    <div class="checklist-card" style="background: #14151b; border-color: rgba(99, 102, 241, 0.4);">
+        <h3 style="text-align: right; margin-top: 0; margin-bottom: 15px; color: #fff; font-size: 1.1rem; display: block;">✨ הוספת רשימה חדשה</h3>
+        <form method="POST" class="add-item-form">
+            <input type="hidden" name="action" value="add_list">
+            <input type="text" name="list_title" placeholder="שם הרשימה החדשה (לדוגמה: ציוד צילום, קניות בטוקיו...)" required>
+            <button type="submit">צור רשימה</button>
+        </form>
+    </div>
+
+    <div style="margin-top: 30px;">
+        {lists_html if lists_html else '<p style="text-align: center; color: var(--text-muted);">טרם נוצרו רשימות. התחל ביצירת רשימה למעלה.</p>'}
+    </div>
     """
     return render_template_string(LAYOUT, content=content)
 
