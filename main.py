@@ -1676,6 +1676,7 @@ def checklists():
         elif action == 'toggle_item':
             cid = request.form.get('list_id')
             iid = request.form.get('item_id')
+            # אם ה-checkbox מסומן, הוא נשלח ב-request. אם לא, הוא לא נשלח בכלל.
             is_done = request.form.get('is_done') == 'on'
             if cid in trip_data['checklists']:
                 for item in trip_data['checklists'][cid]['items']:
@@ -1692,29 +1693,25 @@ def checklists():
             done_class = "done" if item['done'] else ""
             checked_attr = "checked" if item['done'] else ""
             items_html += f"""
-            <li class="checklist-item {done_class}">
-                <form method="POST" id="form_toggle_{item['id']}" style="display: flex; align-items: center; width: 100%; margin: 0;">
-                    <input type="hidden" name="action" value="toggle_item">
-                    <input type="hidden" name="list_id" value="{cid}">
-                    <input type="hidden" name="item_id" value="{item['id']}">
-                    <input type="hidden" name="is_done" id="input_is_done_{item['id']}" value="{'on' if item['done'] else 'off'}">
-                    <label>
-                        <input type="checkbox" {checked_attr} onchange="
-                            document.getElementById('input_is_done_{item['id']}').value = this.checked ? 'on' : 'off';
-                            document.getElementById('form_toggle_{item['id']}').submit();
-                        ">
-                        <span>{item['text']}</span>
-                    </label>
-                </form>
-                <form method="POST" style="margin: 0;">
-                    <input type="hidden" name="action" value="delete_item">
-                    <input type="hidden" name="list_id" value="{cid}">
-                    <input type="hidden" name="item_id" value="{item['id']}">
-                    <button type="submit" class="danger-btn" title="מחק פריט">✕</button>
-                </form>
-            </li>
-            """
-            
+        <li class="checklist-item {done_class}">
+            <form method="POST" id="form_toggle_{item['id']}" style="display: flex; align-items: center; width: 100%; margin: 0;">
+                <input type="hidden" name="action" value="toggle_item">
+                <input type="hidden" name="list_id" value="{cid}">
+                <input type="hidden" name="item_id" value="{item['id']}">
+                <label style="display: flex; align-items: center; gap: 12px; width: 100%; cursor: pointer;">
+                    <input type="checkbox" name="is_done" value="on" {checked_attr} onchange="this.form.submit()" style="width: 20px; height: 20px; cursor: pointer;">
+                    <span>{item['text']}</span>
+                </label>
+            </form>
+            <form method="POST" style="margin: 0;">
+                <input type="hidden" name="action" value="delete_item">
+                <input type="hidden" name="list_id" value="{cid}">
+                <input type="hidden" name="item_id" value="{item['id']}">
+                <button type="submit" class="danger-btn" title="מחק פריט">✕</button>
+            </form>
+        </li>
+        """
+        
         lists_html += f"""
         <div class="checklist-card">
             <div class="checklist-header" onclick="toggleChecklist(this)">
