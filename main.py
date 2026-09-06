@@ -2,7 +2,11 @@ from flask import Flask, render_template_string, request, redirect, url_for, jso
 import json
 import os
 
-DATA_FILE = "trip_data.json"
+# Allow overriding via env var so data can live on a Render persistent disk;
+# otherwise default next to this file (works locally regardless of cwd).
+DATA_FILE = os.environ.get(
+    "DATA_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "trip_data.json")
+)
 
 # מבנה ברירת המחדל המלא של הנתונים (ללא רשימות צ'ק-ליסט בהתחלה)
 DEFAULT_TRIP_DATA = {
@@ -628,7 +632,7 @@ LAYOUT = """
     <title>תכנון טיול ליפן 🇯🇵</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#6366f1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+   <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="טיול ליפן">
     <style>
