@@ -40,7 +40,6 @@ DEFAULT_TRIP_DATA = {
         {"id": "t6", "name": "טאקאיאמה ==> קיוטו (26.9)", "price_ils": 230.74},
         {"id": "t7", "name": "קיוטו ==> אוסקה (1.10)", "price_ils": 31.04},
     ],
-    "checklists": {},
     "attractions": {
         "סאפורו": [
             {
@@ -633,8 +632,10 @@ def load_data():
                         if key not in data:
                             data[key] = DEFAULT_TRIP_DATA[key]
                     return data
+        except urllib.error.HTTPError as e:
+            print(f"Could not load from JSONbin (HTTP {e.code}): {e.read()}", flush=True)
         except Exception as e:
-            print("Could not load from JSONbin, falling back to local file:", e)
+            print("Could not load from JSONbin, falling back to local file:", e, flush=True)
 
     # גיבוי: טעינה מקובץ מקומי אם JSONbin נכשל
     if os.path.exists(DATA_FILE):
@@ -666,8 +667,10 @@ def save_data(data):
                 method="PUT"
             )
             urllib.request.urlopen(req, timeout=5)
+        except urllib.error.HTTPError as e:
+            print(f"Could not save to JSONbin (HTTP {e.code}): {e.read()}", flush=True)
         except Exception as e:
-            print("Could not save to JSONbin:", e)
+            print("Could not save to JSONbin:", e, flush=True)
 
     # שמירה מקומית כגיבוי
     tmp_path = DATA_FILE + ".tmp"
@@ -1284,7 +1287,6 @@ LAYOUT = """
         <a href="/stays">טיסות ומלונות</a>
         <a href="/trains">רכבות</a>
         <a href="/attractions">אטרקציות ופעילויות</a>
-        <a href="/checklists">רשימות צ'ק-ליסט</a>
         <a href="/converter">💱 ממיר מטבע</a>
     </nav>
     {{ content | safe }}
@@ -1516,7 +1518,6 @@ def service_worker():
         '/stays',
         '/trains',
         '/attractions',
-        '/checklists',
         '/converter',
         '/manifest.json'
     ];
@@ -1702,143 +1703,6 @@ def attractions():
         {attrs_html}
         <div style="text-align: center; margin-top: 40px;"><button type="submit">שמור שינויים באטרקציות</button></div>
     </form>
-    """
-    return render_template_string(LAYOUT, content=content)
-
-@app.route('/checklists', methods=['GET', 'POST'])
-@require_auth
-def checklists():
-    trip_data = load_data()
-    
-    if request.method == 'POST':
-        action = request.form.get('action')
-        
-        if 'checklists' not in trip_data:
-            trip_data['checklists'] = {}
-        
-        if action == 'add_list':
-            title = request.form.get('list_title', '').strip()
-            if title:
-                new_id = 'c_' + str(os.urandom(4).hex())
-                trip_data['checklists'][new_id] = {
-                    "title": title,
-                    "items": []
-                }
-                save_data(trip_data)
-                
-        elif action == 'delete_list':
-            cid = request.form.get('list_id')
-            if cid in trip_data['checklists']:
-                del trip_data['checklists'][cid]
-                save_data(trip_data)
-                
-        elif action == 'add_item':
-            cid = request.form.get('list_id')
-            text = request.form.get('item_text', '').strip()
-            if cid in trip_data['checklists'] and text:
-                new_item_id = 'i_' + str(os.urandom(4).hex())
-                trip_data['checklists'][cid]['items'].append({
-                    "id": new_item_id,
-                    "text": text,
-                    "done": False
-                })
-                save_data(trip_data)
-                
-        elif action == 'delete_item':
-            cid = request.form.get('list_id')
-            iid = request.form.get('item_id')
-            if cid in trip_data['checklists']:
-                trip_data['checklists'][cid]['items'] = [
-                    item for item in trip_data['checklists'][cid]['items'] if item['id'] != iid
-                ]
-                save_data(trip_data)
-                
-        elif action == 'toggle_item':
-            cid = request.form.get('list_id')
-            iid = request.form.get('item_id')
-            is_done = request.form.get('is_done') == 'on'
-            if cid in trip_data['checklists']:
-                for item in trip_data['checklists'][cid]['items']:
-                    if item['id'] == iid:
-                        item['done'] = is_done
-                save_data(trip_data)
-                
-        return redirect(url_for('checklists'))
-
-    # בניית ה-HTML של הרשימות
-    lists_html = ""
-    for cid, cdata in trip_data['checklists'].items():
-        items_html = ""
-        for item in cdata['items']:
-            done_class = "done" if item['done'] else ""
-            checked_attr = "checked" if item['done'] else ""
-            items_html += f"""
-            <li class="checklist-item {done_class}">
-                <form method="POST" id="form_toggle_{item['id']}" style="display: flex; align-items: center; width: 100%; margin: 0;">
-                    <input type="hidden" name="action" value="toggle_item">
-                    <input type="hidden" name="list_id" value="{cid}">
-                    <input type="hidden" name="item_id" value="{item['id']}">
-                    <input type="hidden" name="is_done" id="input_is_done_{item['id']}" value="{'on' if item['done'] else 'off'}">
-                    <label>
-                        <input type="checkbox" {checked_attr} onchange="
-                            document.getElementById('input_is_done_{item['id']}').value = this.checked ? 'on' : 'off';
-                            document.getElementById('form_toggle_{item['id']}').submit();
-                        ">
-                        <span>{html.escape(item['text'])}</span>
-                    </label>
-                </form>
-                <form method="POST" style="margin: 0;">
-                    <input type="hidden" name="action" value="delete_item">
-                    <input type="hidden" name="list_id" value="{cid}">
-                    <input type="hidden" name="item_id" value="{item['id']}">
-                    <button type="submit" class="danger-btn" title="מחק פריט">✕</button>
-                </form>
-            </li>
-            """
-            
-        lists_html += f"""
-        <div class="checklist-card">
-            <div class="checklist-header" onclick="toggleChecklist(this)">
-                <h3>
-                    <span class="toggle-icon">▼</span>
-                    📋 {html.escape(cdata['title'])}
-                </h3>
-                <form method="POST" style="margin: 0;" onsubmit="event.stopPropagation(); return confirm('האם למחוק את כל הרשימה?')">
-                    <input type="hidden" name="action" value="delete_list">
-                    <input type="hidden" name="list_id" value="{cid}">
-                    <button type="submit" class="danger-btn" onclick="event.stopPropagation()">מחק רשימה</button>
-                </form>
-            </div>
-            <div class="checklist-content-wrapper">
-                <ul class="checklist-items">
-                    {items_html if items_html else '<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin: 10px 0;">אין עדיין פריטים ברשימה זו.</p>'}
-                </ul>
-                <form method="POST" class="add-item-form">
-                    <input type="hidden" name="action" value="add_item">
-                    <input type="hidden" name="list_id" value="{cid}">
-                    <input type="text" name="item_text" placeholder="הוסף פריט חדש..." required>
-                    <button type="submit">הוסף</button>
-                </form>
-            </div>
-        </div>
-        """
-
-    content = f"""
-    <h2>רשימות צ'ק-ליסט ומשימות</h2>
-    <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">צור רשימות חדשות לניהול הציוד, הקניות או המשימות לקראת הטיול.</p>
-    
-    <div class="checklist-card" style="background: #14151b; border-color: rgba(99, 102, 241, 0.4);">
-        <h3 style="text-align: right; margin-top: 0; margin-bottom: 15px; color: #fff; font-size: 1.1rem; display: block;">✨ הוספת רשימה חדשה</h3>
-        <form method="POST" class="add-item-form">
-            <input type="hidden" name="action" value="add_list">
-            <input type="text" name="list_title" placeholder="שם הרשימה החדשה (לדוגמה: ציוד צילום, קניות בטוקיו...)" required>
-            <button type="submit">צור רשימה</button>
-        </form>
-    </div>
-
-    <div style="margin-top: 30px;">
-        {lists_html if lists_html else '<p style="text-align: center; color: var(--text-muted);">טרם נוצרו רשימות. התחל ביצירת רשימה למעלה.</p>'}
-    </div>
     """
     return render_template_string(LAYOUT, content=content)
 
