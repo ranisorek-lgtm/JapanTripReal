@@ -1709,6 +1709,9 @@ def checklists():
     if request.method == 'POST':
         action = request.form.get('action')
         
+        if 'checklists' not in trip_data:
+            trip_data['checklists'] = {}
+        
         if action == 'add_list':
             title = request.form.get('list_title', '').strip()
             if title:
@@ -1757,6 +1760,85 @@ def checklists():
                 save_data(trip_data)
                 
         return redirect(url_for('checklists'))
+
+    # בניית ה-HTML של הרשימות
+    lists_html = ""
+    for cid, cdata in trip_data['checklists'].items():
+        items_html = ""
+        for item in cdata['items']:
+            done_class = "done" if item['done'] else ""
+            checked_attr = "checked" if item['done'] else ""
+            items_html += f"""
+            <li class="checklist-item {done_class}">
+                <form method="POST" id="form_toggle_{item['id']}" style="display: flex; align-items: center; width: 100%; margin: 0;">
+                    <input type="hidden" name="action" value="toggle_item">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <input type="hidden" name="item_id" value="{item['id']}">
+                    <input type="hidden" name="is_done" id="input_is_done_{item['id']}" value="{'on' if item['done'] else 'off'}">
+                    <label>
+                        <input type="checkbox" {checked_attr} onchange="
+                            document.getElementById('input_is_done_{item['id']}').value = this.checked ? 'on' : 'off';
+                            document.getElementById('form_toggle_{item['id']}').submit();
+                        ">
+                        <span>{html.escape(item['text'])}</span>
+                    </label>
+                </form>
+                <form method="POST" style="margin: 0;">
+                    <input type="hidden" name="action" value="delete_item">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <input type="hidden" name="item_id" value="{item['id']}">
+                    <button type="submit" class="danger-btn" title="מחק פריט">✕</button>
+                </form>
+            </li>
+            """
+            
+        lists_html += f"""
+        <div class="checklist-card">
+            <div class="checklist-header" onclick="toggleChecklist(this)">
+                <h3>
+                    <span class="toggle-icon">▼</span>
+                    📋 {html.escape(cdata['title'])}
+                </h3>
+                <form method="POST" style="margin: 0;" onsubmit="event.stopPropagation(); return confirm('האם למחוק את כל הרשימה?')">
+                    <input type="hidden" name="action" value="delete_list">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <button type="submit" class="danger-btn" onclick="event.stopPropagation()">מחק רשימה</button>
+                </form>
+            </div>
+            <div class="checklist-content-wrapper">
+                <ul class="checklist-items">
+                    {items_html if items_html else '<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin: 10px 0;">אין עדיין פריטים ברשימה זו.</p>'}
+                </ul>
+                <form method="POST" class="add-item-form">
+                    <input type="hidden" name="action" value="add_item">
+                    <input type="hidden" name="list_id" value="{cid}">
+                    <input type="text" name="item_text" placeholder="הוסף פריט חדש..." required>
+                    <button type="submit">הוסף</button>
+                </form>
+            </div>
+        </div>
+        """
+
+    content = f"""
+    <h2>רשימות צ'ק-ליסט ומשימות</h2>
+    <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 25px;">צור רשימות חדשות לניהול הציוד, הקניות או המשימות לקראת הטיול.</p>
+    
+    <div class="checklist-card" style="background: #14151b; border-color: rgba(99, 102, 241, 0.4);">
+        <h3 style="text-align: right; margin-top: 0; margin-bottom: 15px; color: #fff; font-size: 1.1rem; display: block;">✨ הוספת רשימה חדשה</h3>
+        <form method="POST" class="add-item-form">
+            <input type="hidden" name="action" value="add_list">
+            <input type="text" name="list_title" placeholder="שם הרשימה החדשה (לדוגמה: ציוד צילום, קניות בטוקיו...)" required>
+            <button type="submit">צור רשימה</button>
+        </form>
+    </div>
+
+    <div style="margin-top: 30px;">
+        {lists_html if lists_html else '<p style="text-align: center; color: var(--text-muted);">טרם נוצרו רשימות. התחל ביצירת רשימה למעלה.</p>'}
+    </div>
+    """
+    
+    # שורה זו הייתה חסרה בקוד שהצגת:
+    return render_template_string(LAYOUT, content=content)
 
     lists_html = ""
     for cid, cdata in trip_data['checklists'].items():
