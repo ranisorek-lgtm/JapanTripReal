@@ -2,13 +2,7 @@ from flask import Flask, render_template_string, request, redirect, url_for, jso
 import json
 import os
 import html
-import urllib.request
-import urllib.error
 from functools import wraps
-
-# הגדרות JSONbin - נטענות ממשתני סביבה כדי לא לחשוף מפתח סודי בקוד
-JSONBIN_BIN_ID = os.environ.get("JSONBIN_BIN_ID")
-JSONBIN_API_KEY = os.environ.get("JSONBIN_API_KEY")
 
 # Allow overriding via env var so data can live on a Render persistent disk;
 # otherwise default next to this file (works locally regardless of cwd).
@@ -612,32 +606,6 @@ DEFAULT_TRIP_DATA = {
 }
 
 def load_data():
-    # מנסה לטעון מ-JSONbin תחילה, רק אם מוגדרים משתני הסביבה
-    if JSONBIN_BIN_ID and JSONBIN_API_KEY:
-        try:
-            url = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}/latest"
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "X-Master-Key": JSONBIN_API_KEY,
-                    "User-Agent": "Mozilla/5.0"
-                }
-            )
-            with urllib.request.urlopen(req, timeout=5) as response:
-                res_data = json.loads(response.read().decode("utf-8"))
-                # ב-JSONbin v3 הנתונים נמצאים תחת מפתח record
-                data = res_data.get("record", {})
-                if data:
-                    for key in DEFAULT_TRIP_DATA:
-                        if key not in data:
-                            data[key] = DEFAULT_TRIP_DATA[key]
-                    return data
-        except urllib.error.HTTPError as e:
-            print(f"Could not load from JSONbin (HTTP {e.code}): {e.read()}", flush=True)
-        except Exception as e:
-            print("Could not load from JSONbin, falling back to local file:", e, flush=True)
-
-    # גיבוי: טעינה מקובץ מקומי אם JSONbin נכשל
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             try:
@@ -651,28 +619,7 @@ def load_data():
     return DEFAULT_TRIP_DATA
 
 def save_data(data):
-    # שמירה ב-JSONbin בענן, רק אם מוגדרים משתני הסביבה
-    if JSONBIN_BIN_ID and JSONBIN_API_KEY:
-        try:
-            url = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}"
-            req_data = json.dumps(data).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Master-Key": JSONBIN_API_KEY,
-                    "User-Agent": "Mozilla/5.0"
-                },
-                method="PUT"
-            )
-            urllib.request.urlopen(req, timeout=5)
-        except urllib.error.HTTPError as e:
-            print(f"Could not save to JSONbin (HTTP {e.code}): {e.read()}", flush=True)
-        except Exception as e:
-            print("Could not save to JSONbin:", e, flush=True)
-
-    # שמירה מקומית כגיבוי
+    # write to a temp file then atomically replace to avoid corrupting the data on a crash/concurrent write
     tmp_path = DATA_FILE + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
